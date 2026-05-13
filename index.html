@@ -510,7 +510,7 @@ const API_ENDPOINT = '/.netlify/functions/claude';
 
 // 개발/테스트 모드: API 키를 직접 넣어 로컬에서 바로 테스트 가능
 // 실제 배포 시에는 반드시 Netlify Functions 사용
-const DEV_MODE = false; // Netlify 배포 후 false로 변경
+const DEV_MODE = true; // Netlify 배포 후 false로 변경
 const DEV_API_KEY = ''; // 로컬 테스트용 - 실제 키 입력 (배포 시 반드시 제거)
 
 let currentScript = '';
@@ -815,41 +815,19 @@ function renderScript(text, productName) {
   document.getElementById('emptyState').style.display = 'none';
   wrapper.style.display = 'block';
   wrapper.innerHTML = '';
+  currentScript = text;
 
-  // 섹션 파싱
-  const sections = text.split(/\n(?=\[)/);
-
-  sections.forEach((section, i) => {
-    if (!section.trim()) return;
-
-    const headerMatch = section.match(/^\[([^\]]+)\]/);
-    const title = headerMatch ? headerMatch[1] : `섹션 ${i + 1}`;
-    const body = section.replace(/^\[[^\]]+\]\n?/, '').trim();
-
-    const sectionTag = getSectionTag(title);
-    const timeMatch = title.match(/\d+:\d+/g);
-    const timeLabel = timeMatch ? timeMatch.join(' ~ ') : '';
-
-    const sectionEl = document.createElement('div');
-    sectionEl.className = 'script-section';
-
-    // 필수 멘트 하이라이트 처리
-    const processedBody = body.replace(
-      /(퓨처테리어[^\n.]*|구독[^\n.]*버튼[^\n.]*|설명란[^\n.]*|마감[^\n.]*)/g,
-      match => `<span style="color:var(--accent2); font-weight:600;">${match}</span>`
-    );
-
-    sectionEl.innerHTML = `
-      <div class="script-section-header">
-        <span class="section-tag ${sectionTag.tag}">${sectionTag.label}</span>
-        <span class="section-title">${title}</span>
-        ${timeLabel ? `<span class="section-time">${timeLabel}</span>` : ''}
-      </div>
-      <div class="script-section-body">${processedBody}</div>
-    `;
-
-    wrapper.appendChild(sectionEl);
-  });
+  const sectionEl = document.createElement('div');
+  sectionEl.className = 'script-section';
+  const safeText = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  sectionEl.innerHTML = `
+    <div class="script-section-header">
+      <span class="section-tag tag-product">📝 SCRIPT</span>
+      <span class="section-title">${productName} 대본</span>
+    </div>
+    <div class="script-section-body" style="white-space:pre-wrap;">${safeText}</div>
+  `;
+  wrapper.appendChild(sectionEl);
 }
 
 function renderVerifyResult(response) {
@@ -983,4 +961,6 @@ function resetAll() {
 </script>
 
 </body>
+</html>
+
 </html>
