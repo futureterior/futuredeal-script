@@ -10,12 +10,8 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: '' };
   }
 
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
-  }
-
   try {
-    const { systemPrompt, userMessage, useWebSearch } = JSON.parse(event.body);
+    const { systemPrompt, userMessage } = JSON.parse(event.body);
 
     const reqBody = {
       model: 'claude-sonnet-4-20250514',
@@ -23,10 +19,6 @@ exports.handler = async (event) => {
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }]
     };
-
-    if (useWebSearch) {
-      reqBody.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
-    }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -39,14 +31,24 @@ exports.handler = async (event) => {
     });
 
     const data = await response.json();
-    const result = (data.content || [])
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('');
+    console.log('API response:', JSON.stringify(data).slice(0, 500));
+
+    let result = '';
+    if (data.content && Array.isArray(data.content)) {
+      result = data.content
+        .filter(b => b.type === 'text')
+        .map(b => b.text)
+        .join('');
+    }
+
+    if (!result && data.error) {
+      return { statusCode: 500, headers, body: JSON.stringify({ error: data.error.message }) };
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify({ result }) };
 
   } catch (err) {
+    console.error('Error:', err.message);
     return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
   }
 };
