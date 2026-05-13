@@ -1,13 +1,12 @@
 exports.handler = async (event) => {
-  const headers = {
+  const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json'
   };
 
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return { statusCode: 200, headers: corsHeaders, body: '' };
   }
 
   try {
@@ -16,6 +15,7 @@ exports.handler = async (event) => {
     const reqBody = {
       model: 'claude-sonnet-4-5',
       max_tokens: 4000,
+      stream: true,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }]
     };
@@ -30,25 +30,35 @@ exports.handler = async (event) => {
       body: JSON.stringify(reqBody)
     });
 
-    const data = await response.json();
-    console.log('API response:', JSON.stringify(data).slice(0, 500));
+    const text = await response.text();
 
     let result = '';
-    if (data.content && Array.isArray(data.content)) {
-      result = data.content
-        .filter(b => b.type === 'text')
-        .map(b => b.text)
-        .join('');
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.type === 'content_block_delta' && data.delta && data.delta.type === 'text_delta') {
+            result += data.delta.text;
+          }
+        } catch (e) {}
+      }
     }
 
-    if (!result && data.error) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: data.error.message }) };
-    }
+    console.log('Result length:', result.length);
 
-    return { statusCode: 200, headers, body: JSON.stringify({ result }) };
+    return {
+      statusCode: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ result })
+    };
 
   } catch (err) {
     console.error('Error:', err.message);
-    return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+    return {
+      statusCode: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: err.message })
+    };
   }
 };
