@@ -1,6 +1,3 @@
-
-const https = require('https');
-
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -13,35 +10,43 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: '' };
   }
 
-  const { systemPrompt, userMessage, useWebSearch } = JSON.parse(event.body);
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
+  }
 
-  const body = JSON.stringify({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4000,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }],
-    ...(useWebSearch ? { tools: [{ type: 'web_search_20250305', name: 'web_search' }] } : {})
-  });
+  try {
+    const { systemPrompt, userMessage, useWebSearch } = JSON.parse(event.body);
 
-  return new Promise((resolve) => {
-    const req = https.request({
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
+    const reqBody = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    };
+
+    if (useWebSearch) {
+      reqBody.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          const result = parsed.content
-            .filter(b => b.type === 'text')
-            .map(b => b.text)
-            .join('');
-          resolve({ statusCode: 200, headers, body: JSON.stringify({ re
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(reqBody)
+    });
+
+    const data = await response.json();
+    const result = (data.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('');
+
+    return { statusCode: 200, headers, body: JSON.stringify({ result }) };
+
+  } catch (err) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
+  }
+};
