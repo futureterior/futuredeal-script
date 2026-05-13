@@ -14,7 +14,7 @@ exports.handler = async (event) => {
     const { systemPrompt, userMessage } = JSON.parse(event.body);
 
     const reqBody = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }]
